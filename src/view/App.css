@@ -11,3 +11,19 @@ body,
 #root {
   height: 100%;
 }
+
+.tableContainer {
+  overflow-y: scroll;
+  padding: 0;
+  margin: 0;
+}
+
+table {
+  width: 100%;
+}
+
+thead {
+  position: sticky;
+  top: -1px;
+  background-color: white;
+}
