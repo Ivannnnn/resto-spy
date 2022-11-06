@@ -20,10 +20,36 @@ body,
 
 table {
   width: 100%;
+  table-layout: fixed;
 }
 
 thead {
   position: sticky;
   top: -1px;
   background-color: white;
+}
+
+thead tr th:nth-child(1) {
+  width: 340px;
+}
+
+table td,
+table th {
+  text-align: center;
+}
+
+table td:first-child,
+table th:first-child {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  text-align: left;
+}
+
+table tr[status='left'] {
+  background: #fecaca;
+}
+
+table tr[status='joined'] {
+  background: #bbf7d0;
 }

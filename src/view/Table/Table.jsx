@@ -22,6 +22,7 @@ const useResize = (cb, track, wait = 0) => {
 }
 
 export default function Table({ data, headers, className }) {
+  console.log(data)
   const container = useRef()
 
   const setTableHeight = () => {
@@ -44,11 +45,11 @@ export default function Table({ data, headers, className }) {
         )}
       >
         <thead>
-          <tr className="bg-gray-200 text-lg tracking-tighter">
+          <tr className="bg-gray-200 tracking-tighter">
             {headers.map((header, i) => (
               <th
                 key={i}
-                className="border p-2 dark:border-dark-5 whitespace-nowrap font-normal text-gray-900"
+                className="border p-2 dark:border-dark-5 whitespace-nowrap text-gray-900"
               >
                 {header}
               </th>
@@ -57,12 +58,20 @@ export default function Table({ data, headers, className }) {
         </thead>
         <tbody>
           {data.map((row) => (
-            <tr key={row[0]} className="text-gray-700 text-md">
-              {row.slice(1).map((column, i) => (
-                <td key={i} className="border px-3 py-2 dark:border-dark-5">
-                  {column}
-                </td>
-              ))}
+            <tr {...row[0]} className="text-gray-700 text-md">
+              {row.slice(1).map((column, i) =>
+                typeof column === 'function' ? (
+                  <td
+                    key={i}
+                    className="border px-3 py-2 dark:border-dark-5"
+                    dangerouslySetInnerHTML={{ __html: column(row) }}
+                  ></td>
+                ) : (
+                  <td key={i} className="border px-3 py-2 dark:border-dark-5">
+                    {column}
+                  </td>
+                )
+              )}
             </tr>
           ))}
         </tbody>

@@ -1,11 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { restos } from '../fakeData'
 import { ChevronIcon } from '@/view/Icon'
 import Table from './Table/Table'
 
-const plus = (num) => (num > 0 ? '+' + num : num)
-
-function Select({ options }) {
+function Select({ options, selected, onChange }) {
   return (
     <select
       className="form-select form-select-lg w-40 appearance-none px-4 py-2 text-md font-normal text-gray-700
@@ -13,49 +11,34 @@ function Select({ options }) {
               rounded transition ease-in-out m-0 cursor-pointer
             focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none"
       aria-label=".form-select-lg example"
+      onChange={(e) => onChange(e.target.value)}
+      value={selected}
     >
-      {options.map((option) => (
-        <option key={option} value={option}>
-          {option}
+      {Object.keys(options).map((name) => (
+        <option key={name} value={name}>
+          {options[name]}
         </option>
       ))}
     </select>
   )
 }
 
-function displayStatus({ before, after }) {
-  return (
-    {
-      'true-false': 'left',
-      'false-true': 'joined',
-    }[`${!!before}-${!!after}`] || null
-  )
-}
+const displayDiff = (resto, prop) => {
+  const diff = resto[prop + 'Diff']
 
-function displayName({ before, after }) {
-  return `${(after || before).name} ${(after || before).branch.replace(
-    /Leipzig/g,
-    ''
-  )}`
-}
-
-function displayPopularity({ after, diff }) {
-  if (!after) return null
-  return `${after.popularity} (${plus(diff.popularity)})`
-}
-
-function displayScore({ after, diff }) {
-  if (!after) return null
-  return `${after.score} (${plus(diff.score)})`
-}
-
-function displayVotes({ after, diff }) {
-  if (!after) return null
-  return `${after.votes} (${plus(diff.votes)})`
+  return typeof resto[prop + 'Diff'] !== 'undefined'
+    ? ` <span class="${
+        diff < 0 ? 'text-red-500' : diff === 0 ? '' : 'text-green-500'
+      }">${diff < 0 ? `(${diff})` : diff === 0 ? '' : `(+${diff})`}</span>`
+    : ''
 }
 
 export default function App() {
   const map = useRef()
+  const [sortBy, setSortBy] = useState('status')
+
+  console.log(sortBy)
+  const direction = 'desc'
 
   useEffect(() => {
     return
@@ -69,20 +52,44 @@ export default function App() {
     }
   }, [])
 
-  const sortBy = 'score'
+  let data = restos.map(({ before, after, diff }) => {
+    return {
+      id: (after || before).id,
+      name: (
+        (after || before).name +
+        ' ' +
+        (after || before).branch.replace(/Leipzig/g, '')
+      ).trim(),
+      status:
+        {
+          'true-false': 'left',
+          'false-true': 'joined',
+        }[`${!!before}-${!!after}`] || '',
+      popularity: (after || before).popularity,
+      popularityDiff: diff?.popularity,
+      rating: (after || before).score,
+      ratingDiff: diff?.score,
+      votes: (after || before).votes,
+      votesDiff: diff?.votes,
+    }
+  })
 
-  const data = restos
-    //.sort((a, b) => (a[sortBy] < b[sortBy] ? 1 : -1))
+  console.log(data)
+
+  data = data
+    .sort(
+      (a, b) =>
+        (a[sortBy] === undefined) - (b[sortBy] === undefined) || // undefined always at bottom
+        (a[sortBy] < b[sortBy] ? 1 : -1)
+    )
     .map((resto) => {
-      return [(resto.after || resto.before).id].concat(
-        [
-          displayName,
-          displayStatus,
-          displayPopularity,
-          displayScore,
-          displayVotes,
-        ].map((f) => f(resto))
-      )
+      return [
+        { key: resto.id, status: resto.status || null },
+        resto.name,
+        () => resto.popularity + displayDiff(resto, 'popularity'),
+        () => resto.rating + displayDiff(resto, 'rating'),
+        () => resto.votes + displayDiff(resto, 'votes'),
+      ]
     })
 
   return (
@@ -107,30 +114,37 @@ export default function App() {
           </button>
         </div>
 
-        <div className="mb-3 ml-2">
+        <div className="mb-3 ml-2 flex items-center">
           <label className="inline-block mr-3 text-base font-medium text-gray-900 dark:text-gray-400">
             Sort by:
           </label>
 
           <Select
-            options={[
-              'Status',
-              'Popularity',
-              'Rating',
-              'Votes',
-              'Popularity Δ',
-              'Rating Δ',
-              'Votes Δ',
-            ]}
+            options={{
+              status: 'Status',
+              popularity: 'Popularity',
+              rating: 'Rating',
+              votes: 'Votes',
+              popularityDiff: 'Popularity Δ',
+              ratingDiff: 'Rating Δ',
+              votesDiff: 'Votes Δ',
+            }}
+            selected={sortBy}
+            onChange={(val) => setSortBy(val)}
           />
 
           <button className="px-2 py-2 m-0 bg-white align-bottom border border-solid border-gray-300 ml-1">
             <ChevronIcon className="w-4 h-4" direction="90" />
           </button>
+
+          <p class="text-right grow mr-4 font-bold text-lg">
+            {data.length} <span class="font-normal text-base">restaurants</span>
+          </p>
         </div>
+
         <Table
           data={data}
-          headers={['Name', 'Status', 'Popularity', 'Rating', 'Votes']}
+          headers={['Name', 'Popularity', 'Rating', 'Votes']}
           className="mx-auto"
         />
       </div>
