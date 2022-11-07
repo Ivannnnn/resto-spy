@@ -22,14 +22,13 @@ const useResize = (cb, track, wait = 0) => {
 }
 
 export default function Table({ data, headers, className }) {
-  console.log(data)
   const container = useRef()
 
   const setTableHeight = () => {
     container.current.style.height =
       window.innerHeight -
-      container.current.getBoundingClientRect().top +
-      //48
+      container.current.getBoundingClientRect().top -
+      32 +
       'px'
   }
 

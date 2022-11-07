@@ -1,27 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
-import { restos } from '../fakeData'
+import { useEffect, useRef } from 'react'
 import { ChevronIcon } from '@/view/Icon'
 import Table from './Table/Table'
-
-function Select({ options, selected, onChange }) {
-  return (
-    <select
-      className="form-select form-select-lg w-40 appearance-none px-4 py-2 text-md font-normal text-gray-700
-              bg-white bg-clip-padding bg-no-repeat border border-solid border-gray-300
-              rounded transition ease-in-out m-0 cursor-pointer
-            focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none"
-      aria-label=".form-select-lg example"
-      onChange={(e) => onChange(e.target.value)}
-      value={selected}
-    >
-      {Object.keys(options).map((name) => (
-        <option key={name} value={name}>
-          {options[name]}
-        </option>
-      ))}
-    </select>
-  )
-}
+import Select from './Select'
+import { useUpdateState } from '@/helpers'
 
 const displayDiff = (resto, prop) => {
   const diff = resto[prop + 'Diff']
@@ -33,12 +14,41 @@ const displayDiff = (resto, prop) => {
     : ''
 }
 
+const getRestos = async (from, to) => {
+  const restos = (
+    await fetch(
+      `https://ivansempire.com/api/restos/ondates/${from},${to}`
+    ).then((r) => r.json())
+  ).map((resto) => {
+    return { ...resto, date: resto.date.slice(0, 10) }
+  })
+
+  const byIdAndDate = {}
+  restos.forEach((resto) => {
+    if (!byIdAndDate[resto.id]) byIdAndDate[resto.id] = []
+    byIdAndDate[resto.id][Number(resto.date === to)] = resto
+  })
+
+  const diffs = Object.values(byIdAndDate).map(([before, after]) => {
+    return {
+      before,
+      after,
+      diff: !!before &&
+        !!after && {
+          votes: after.votes - before.votes,
+          popularity: after.popularity - before.popularity,
+          score: Number((after.score - before.score).toPrecision(2)),
+        },
+    }
+  })
+
+  return diffs
+}
+
 export default function App() {
   const map = useRef()
-  const [sortBy, setSortBy] = useState('status')
-
-  console.log(sortBy)
-  const direction = 'desc'
+  const [sort, updateSort] = useUpdateState({ by: 'status', order: 1 })
+  const [data, updateData] = useUpdateState({ loading: true })
 
   useEffect(() => {
     return
@@ -52,35 +62,39 @@ export default function App() {
     }
   }, [])
 
-  let data = restos.map(({ before, after, diff }) => {
-    return {
-      id: (after || before).id,
-      name: (
-        (after || before).name +
-        ' ' +
-        (after || before).branch.replace(/Leipzig/g, '')
-      ).trim(),
-      status:
-        {
-          'true-false': 'left',
-          'false-true': 'joined',
-        }[`${!!before}-${!!after}`] || '',
-      popularity: (after || before).popularity,
-      popularityDiff: diff?.popularity,
-      rating: (after || before).score,
-      ratingDiff: diff?.score,
-      votes: (after || before).votes,
-      votesDiff: diff?.votes,
-    }
-  })
+  useEffect(() => {
+    updateData(getRestos('2022-11-01', '2022-11-07'))
+  }, [])
 
-  console.log(data)
+  if (data.loading) return <h1 className="3xl">Loading...</h1>
 
-  data = data
+  const preparedData = data
+    .map(({ before, after, diff }) => {
+      return {
+        id: (after || before).id,
+        name: (
+          (after || before).name +
+          ' ' +
+          (after || before).branch.replace(/Leipzig/g, '')
+        ).trim(),
+        status:
+          {
+            'true-false': 'left',
+            'false-true': 'joined',
+          }[`${!!before}-${!!after}`] || '',
+        popularity: (after || before).popularity,
+        popularityDiff: diff?.popularity,
+        rating: (after || before).score,
+        ratingDiff: diff?.score,
+        votes: (after || before).votes,
+        votesDiff: diff?.votes,
+      }
+    })
     .sort(
       (a, b) =>
-        (a[sortBy] === undefined) - (b[sortBy] === undefined) || // undefined always at bottom
-        (a[sortBy] < b[sortBy] ? 1 : -1)
+        (a[sort.by] === undefined) - (b[sort.by] === undefined) || // undefined always at bottom
+        -1 * sort.order * (a[sort.by] > b[sort.by]) ||
+        sort.order * (a[sort.by] < b[sort.by])
     )
     .map((resto) => {
       return [
@@ -94,9 +108,7 @@ export default function App() {
 
   return (
     <div className="h-full bg-gray-100 text-gray-800">
-      <div id="map" className="h-52 bg-blue-100">
-        map
-      </div>
+      <div id="map" className="h-52 bg-blue-100"></div>
 
       <div className="container mx-auto max-w-2xl">
         <div className="flex items-center justify-between py-2 px-16 my-2">
@@ -129,21 +141,29 @@ export default function App() {
               ratingDiff: 'Rating Δ',
               votesDiff: 'Votes Δ',
             }}
-            selected={sortBy}
-            onChange={(val) => setSortBy(val)}
+            selected={sort.by}
+            onChange={(by) => updateSort({ by })}
           />
 
-          <button className="px-2 py-2 m-0 bg-white align-bottom border border-solid border-gray-300 ml-1">
-            <ChevronIcon className="w-4 h-4" direction="90" />
+          <button
+            className="px-2 py-2 m-0 bg-white align-bottom border border-solid border-gray-300 ml-1"
+            onClick={() =>
+              updateSort({
+                order: sort.order === 1 ? -1 : 1,
+              })
+            }
+          >
+            <ChevronIcon className="w-4 h-4" direction={sort.order * 90} />
           </button>
 
-          <p class="text-right grow mr-4 font-bold text-lg">
-            {data.length} <span class="font-normal text-base">restaurants</span>
+          <p className="text-right grow mr-4 font-bold text-lg">
+            {preparedData.length}{' '}
+            <span className="font-normal text-base">restaurants</span>
           </p>
         </div>
 
         <Table
-          data={data}
+          data={preparedData}
           headers={['Name', 'Popularity', 'Rating', 'Votes']}
           className="mx-auto"
         />
@@ -159,60 +179,3 @@ export default function App() {
     </div>
   )
 }
-
-//
-;(async function () {
-  const restos = (
-    await fetch(
-      `https://ivansempire.com/api/restos/ondates/2022-10-17,2022-10-23`
-    ).then((r) => r.json())
-  ).map((resto) => {
-    return { ...resto, date: resto.date.slice(0, 10) }
-  })
-
-  function toCSV(data) {
-    return data
-      .map((row) => {
-        return '"' + row.join('","') + '"'
-      })
-      .join('\n')
-  }
-
-  const byIdAndDate = {}
-  restos.forEach((resto) => {
-    byIdAndDate[resto.id]
-      ? byIdAndDate[resto.id].push(resto)
-      : (byIdAndDate[resto.id] = [resto])
-  })
-
-  const diffs = Object.values(byIdAndDate).map(([before, after]) => {
-    return {
-      before,
-      after,
-      diff: !!before &&
-        !!after && {
-          votes: after.votes - before.votes,
-          popularity: after.popularity - before.popularity,
-          score: Number((after.score - before.score).toPrecision(2)),
-        },
-    }
-  })
-
-  const sortBy = 'score'
-
-  const diffsTable = diffs
-    .filter(Boolean)
-    .sort((a, b) => (a[sortBy] < b[sortBy] ? 1 : -1))
-    .map(({ after, popularity, votes, score }) => {
-      return [
-        `${after.name} ${after.branch}`,
-        `${after.popularity}(${popularity})`,
-        `${after.votes}(${votes})`,
-        `${after.score}(${score})`,
-      ]
-    })
-
-  //console.log(toCSV(diffsTable))
-
-  //console.log('name | popularity | votes | score\n' + str)
-})
